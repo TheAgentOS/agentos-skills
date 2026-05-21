@@ -33,15 +33,37 @@ Express, Vercel AI SDK, Next.js, Hono, etc. The framework determines where
 
 ## 2. Gather configuration
 
-Three values are required. Check, in order:
+Two values are required from the user. The endpoint is auto-defaulted — do
+**NOT** ask the user about it unless one of the override conditions below
+fires.
 
-1. **Environment** — `AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`, `AGENTOS_ENDPOINT`.
+### Required: `AGENTOS_API_KEY` and `AGENTOS_WORKSPACE_ID`
+
+Check, in order:
+
+1. **Environment** — `AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`.
 2. **A user-provided file** like `.env`, `.env.local`, `.envrc`.
-3. **Ask the user** if not found. Tell them to grab values from
+3. **Ask the user** if neither is found. Direct them to
    https://app.theagentos.space :
    - `AGENTOS_API_KEY` — Settings → API Keys → "New default credential"
-   - `AGENTOS_WORKSPACE_ID` — copy from the top-right of any dashboard page
-   - `AGENTOS_ENDPOINT` — default `https://api.theagentos.space` (only override for self-hosted)
+   - `AGENTOS_WORKSPACE_ID` — bottom-left of the sidebar (click the chip to
+     copy), or top-right of the dashboard
+
+### Endpoint: default silently
+
+`AGENTOS_ENDPOINT` resolves in this order without prompting the user:
+
+1. If `AGENTOS_ENDPOINT` is already set in env or `.env`, use that.
+2. Otherwise, use the default: `https://api.theagentos.space`.
+
+**Only prompt the user about the endpoint if** you have *positive evidence*
+they want to override it, such as:
+- They typed something like "I'm self-hosting" or "we run agenthog on our
+  own infra" in their request.
+- A previous `.env` file already had a non-default `AGENTOS_ENDPOINT` set.
+
+Otherwise: pick the default and move on. Asking for the endpoint on every
+quickstart is annoying friction for the 95% who use the hosted cloud.
 
 **Never commit the plaintext API key.** Always write it to `.env` (gitignored)
 and add a placeholder line to `.env.example`.
