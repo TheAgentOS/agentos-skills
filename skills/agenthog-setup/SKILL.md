@@ -237,23 +237,55 @@ Add the real values to `.env`. Confirm `.env` is in `.gitignore` (it usually is)
 
 ## 7. Verify
 
-Run the app. Exercise one request that hits the wrapped handler. Then:
+Run the app. Exercise one request that hits the wrapped handler. Then
+verify via **one** of these paths, in order of simplicity:
 
-```bash
-# CLI verifier
-agenthog audit verify --workspace-id $AGENTOS_WORKSPACE_ID
+### Path A — Dashboard (always works)
+
+Open in a browser:
+
+```
+https://app.theagentos.space/traces
 ```
 
-Or visit `https://app.theagentos.space/traces` in a browser — your trace
-should appear within a few seconds.
+Sign in if needed. A trace from the request you just exercised should
+appear within a few seconds. **Use this path by default.**
 
-If no trace appears after 30 seconds:
+### Path B — CLI verifier (offline, cryptographic)
+
+The `agenthog` CLI ships as an installed entrypoint, NOT as `python -m
+agenthog`. There is no `__main__.py`. Invoke the entrypoint directly:
+
+```bash
+# If agenthog[audit] is installed in the active env:
+agenthog audit verify --workspace-id $AGENTOS_WORKSPACE_ID
+
+# Or, ephemerally without modifying the project's deps:
+uvx --with 'agenthog[audit]' agenthog audit verify --workspace-id $AGENTOS_WORKSPACE_ID
+
+# Or, with uv run from outside any project (mirrors `uv run --no-project`):
+uv run --no-project --with 'agenthog[audit]' agenthog audit verify \
+    --workspace-id $AGENTOS_WORKSPACE_ID
+```
+
+**Do not** run `python -m agenthog audit verify` — that fails with
+`'agenthog' is a package and cannot be directly executed`. The CLI is
+invoked via the `agenthog` console-script entrypoint, not the module
+runner.
+
+Note: `agenthog audit verify` requires the `[audit]` extra (pulls in
+`cryptography` for Ed25519 verification). If you only installed
+`agenthog[openai]` for tracing, add `[audit]` for verification or use
+Path A.
+
+### If no trace appears after 30 seconds
 
 1. Check the app's stdout for `[agenthog.sdk]` warning lines.
 2. Confirm `AGENTOS_API_KEY` is loaded (not empty, not the placeholder).
 3. Confirm the endpoint is reachable: `curl -I $AGENTOS_ENDPOINT`.
-4. Confirm the app actually called `init` before the request hit (sometimes
-   `init` is wired after the handler — fix the import order).
+4. Confirm the app actually called `init` before the handler runs
+   (sometimes `init` is wired after the handler import — fix the import
+   order so `init` runs first at module load).
 
 ## 8. Report back
 
