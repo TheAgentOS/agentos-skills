@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-plugin.json",
+  "name": "agentos-skills",
+  "version": "0.1.0",
+  "description": "Agent skills for the AgentOS platform — AgentHog, AgentRun, AgentSec, AgentBuild.",
+  "homepage": "https://github.com/TheAgentOS/agentos-skills",
+  "license": "MIT",
+  "skills": [
+    "skills/agenthog-setup",
+    "skills/agenthog-add-eval",
+    "skills/agentrun-deploy",
+    "skills/agentsec-probe-suite",
+    "skills/agentbuild-init"
+  ]
+}
