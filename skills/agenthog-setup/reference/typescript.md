@@ -51,7 +51,7 @@ await startTaskRun(
     agentId?: string,
     taskRunId?: string,
     traceId?: string,
-    metadata?: Record<string, unknown>,
+    userId?: string,
     sessionId?: string,
   },
   async (ctx) => {
@@ -60,6 +60,9 @@ await startTaskRun(
   },
 );
 ```
+
+Note: `StartTaskRunArgs` has no `metadata` field — attach identifiers via
+`userId`, `sessionId`, `agentId`, etc.
 
 Why callback vs. context manager (Python's `with`): JS lacks RAII, so the
 callback form is the most reliable way to guarantee the run gets closed

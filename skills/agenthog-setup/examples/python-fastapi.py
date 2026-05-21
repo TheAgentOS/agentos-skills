@@ -36,7 +36,7 @@ class ChatRequest(BaseModel):
 async def chat(req: ChatRequest) -> dict[str, str]:
     # 3. Wrap the per-request loop. Everything inside this with-block becomes
     #    one task_run; LLM calls auto-instrumented above become spans on it.
-    with agenthog.start_task_run(metadata={"user_id": req.user_id}) as ctx:
+    with agenthog.start_task_run(user_id=req.user_id) as ctx:
         # ... your agent logic here. Example placeholder:
         reply = await call_my_llm(req.message)
         return {"reply": reply, "trace_id": ctx.trace_id}

@@ -26,7 +26,7 @@ export async function POST(req: Request): Promise<Response> {
   const { messages, userId } = await req.json();
 
   return await startTaskRun(
-    { metadata: { userId } },
+    { userId },
     async (ctx) => {
       const { text } = await generateText({
         model: openai("gpt-4o-mini"),

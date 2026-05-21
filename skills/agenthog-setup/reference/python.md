@@ -53,12 +53,15 @@ with agenthog.start_task_run(
     agent_id: str | None = None,        # override the global default for this run
     task_run_id: str | None = None,     # provide your own ID; auto-generated otherwise
     trace_id: str | None = None,        # W3C trace context inbound
-    metadata: dict | None = None,       # arbitrary k/v on the run
+    user_id: str | None = None,         # attribute the run to a specific user
     session_id: str | None = None,      # group runs into a conversation
 ) as ctx:
     # ctx.task_run_id, ctx.trace_id, ctx.span_id available
     ...
 ```
+
+Note: there is no `metadata=` kwarg. Attach identifiers via the explicit
+kwargs above (`user_id`, `session_id`, `agent_id`, etc.).
 
 ### `start_span` — nest spans inside a task run
 

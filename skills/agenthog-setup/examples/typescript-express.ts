@@ -29,7 +29,7 @@ app.use(express.json());
 //    above will auto-correlate; explicit wrapping makes the contract obvious.
 app.post("/chat", async (req, res) => {
   await startTaskRun(
-    { metadata: { userId: req.body.userId } },
+    { userId: req.body.userId },
     async (ctx) => {
       const reply = await callMyLLM(req.body.message);
       res.json({ reply, traceId: ctx.traceId });

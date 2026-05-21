@@ -49,9 +49,10 @@ graph.add_edge("summarizer", END)
 app = graph.compile()
 
 
-def run(user_message: str) -> dict:
+def run(user_message: str, user_id: str = "anonymous") -> dict:
     # 3. Wrap the graph invocation — one task_run per end-to-end user request.
-    with agenthog.start_task_run(metadata={"request": user_message}):
+    #    Use user_id to attribute; session_id to group into conversations.
+    with agenthog.start_task_run(user_id=user_id):
         return app.invoke({"messages": [HumanMessage(user_message)]})
 
 

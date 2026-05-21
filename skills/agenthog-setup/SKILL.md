@@ -184,18 +184,22 @@ final response, or one cron trigger → one job complete). Spans nest inside it.
 ### Python — context manager
 
 ```python
-with agenthog.start_task_run(metadata={"user_id": user_id}) as ctx:
+with agenthog.start_task_run(user_id=user_id) as ctx:
     # all LLM calls + tool calls in here are traced under one task_run_id
     result = my_agent.run(user_input)
     return result
 ```
+
+Available kwargs: `agent_id`, `task_run_id`, `trace_id`, `user_id`,
+`session_id`. There is **no** `metadata=` kwarg — attach attribution via
+the explicit kwargs above instead.
 
 For an HTTP handler (FastAPI/Flask), wrap the handler body:
 
 ```python
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    with agenthog.start_task_run(metadata={"user_id": req.user_id}):
+    with agenthog.start_task_run(user_id=req.user_id):
         return await my_agent.run(req.message)
 ```
 
@@ -205,12 +209,15 @@ async def chat(req: ChatRequest):
 import { startTaskRun } from "agenthog";
 
 app.post("/chat", async (req, res) => {
-  await startTaskRun({ metadata: { userId: req.body.userId } }, async () => {
+  await startTaskRun({ userId: req.body.userId }, async () => {
     const out = await myAgent.run(req.body.message);
     res.json(out);
   });
 });
 ```
+
+Available `StartTaskRunArgs` fields: `agentId`, `taskRunId`, `traceId`,
+`userId`, `sessionId`. No `metadata` field.
 
 If the user's framework has a middleware concept (Express, Hono, FastAPI
 middleware), prefer wiring `start_task_run` as a middleware so every request
