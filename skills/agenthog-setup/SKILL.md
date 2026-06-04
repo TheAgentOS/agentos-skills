@@ -68,57 +68,91 @@ quickstart is annoying friction for the 95% who use the hosted cloud.
 **Never commit the plaintext API key.** Always write it to `.env` (gitignored)
 and add a placeholder line to `.env.example`.
 
-## 3. Install the SDK
+## 3. Install the SDK (a new-enough version is mandatory)
+
+> **Minimum supported version: `agenthog >= 0.3.0`.** Newer features
+> (`log_tool_call` / `logToolCall`, `log_flag_check` / `logFlagCheck`, the
+> feature-flag/experiment resolver) require it, and the ingestion API **rejects
+> events from older SDKs** (HTTP 426). You — the AI coding agent running this
+> skill — MUST install or upgrade to satisfy this floor automatically. Do **not**
+> ask the user to do it by hand, and do **not** leave an older version in place.
+
+Always pin the floor and pass the upgrade flag so an existing older install is
+bumped, not left as-is.
 
 ### Python
 
-Detect the package manager (`uv`, `poetry`, `pip`, `pipenv`):
+Detect the package manager (`uv`, `poetry`, `pip`, `pipenv`) and install with the
+version floor + upgrade:
 
 ```bash
-# uv
-uv add agenthog
+# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.3.0)
+uv add 'agenthog>=0.3.0'
 
 # poetry
-poetry add agenthog
+poetry add 'agenthog@>=0.3.0'
 
-# pip
-pip install agenthog
+# pip  (-U upgrades an already-installed older copy)
+pip install -U 'agenthog>=0.3.0'
 ```
 
 For frameworks with first-class auto-instrumentation, install the extras:
 
 ```bash
 # OpenAI calls
-uv add 'agenthog[openai]'
+uv add 'agenthog[openai]>=0.3.0'
 
 # Anthropic
-uv add 'agenthog[anthropic]'
+uv add 'agenthog[anthropic]>=0.3.0'
 
 # LangChain / LangGraph
-uv add 'agenthog[langchain]'
+uv add 'agenthog[langchain]>=0.3.0'
 
 # OpenTelemetry passthrough
-uv add 'agenthog[otel]'
+uv add 'agenthog[otel]>=0.3.0'
 ```
 
 ### TypeScript
 
 ```bash
 # pnpm (preferred)
-pnpm add agenthog
+pnpm add agenthog@latest
 
 # npm
-npm install agenthog
+npm install agenthog@latest
 
 # yarn
-yarn add agenthog
+yarn add agenthog@latest
 
 # bun
-bun add agenthog
+bun add agenthog@latest
 ```
 
 Auto-instrumentation in TS is wired via the integrations import — no extras
 required at install time. See `reference/typescript.md`.
+
+### Verify the installed version satisfies the floor (do not skip)
+
+After installing, confirm the version is `>= 0.3.0`. If it isn't, upgrade and
+re-check before continuing — the rest of the setup (and the ingestion API)
+assumes it.
+
+```bash
+# Python
+python -c "import agenthog, sys; from importlib.metadata import version; \
+v=version('agenthog'); print('agenthog', v); \
+sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,3) else 1)" \
+  || pip install -U 'agenthog>=0.3.0'
+
+# TypeScript
+node -e "const v=require('agenthog/package.json').version; const [a,b]=v.split('.').map(Number); \
+console.log('agenthog', v); process.exit((a>0||b>=3)?0:1)" \
+  || npm install agenthog@latest
+```
+
+If the floor still can't be met (e.g. the registry hasn't published `0.3.0`
+yet), **stop and tell the user** rather than proceeding on an unsupported
+version — their telemetry would be rejected at ingest.
 
 ## 4. Wire `init` at app startup
 
@@ -185,7 +219,9 @@ final response, or one cron trigger → one job complete). Spans nest inside it.
 
 ```python
 with agenthog.start_task_run(user_id=user_id) as ctx:
-    # all LLM calls + tool calls in here are traced under one task_run_id
+    # Auto-instrumented LLM calls in here are traced under one task_run_id.
+    # Tool calls are NOT auto-traced unless they go through a framework
+    # (LangChain/LangGraph) — see Step 5b for hand-written tool loops.
     result = my_agent.run(user_input)
     return result
 ```
@@ -222,6 +258,33 @@ Available `StartTaskRunArgs` fields: `agentId`, `taskRunId`, `traceId`,
 If the user's framework has a middleware concept (Express, Hono, FastAPI
 middleware), prefer wiring `start_task_run` as a middleware so every request
 gets a task_run automatically.
+
+## 5b. Instrument tool calls (hand-written agent loops)
+
+`autoinstrument()` patches LLM SDKs (`openai`/`anthropic`/`langchain`) and
+LangChain/LangGraph tool nodes — but **not** tool calls you execute yourself in
+a raw OpenAI/Anthropic tool-calling loop. Those run untraced, so the trace shows
+only LLM steps; evals that look for tool usage then wrongly report "the agent
+never used a tool / hallucinated."
+
+If the agent executes tools in its own loop, log each one explicitly so it shows
+up as a `tool_call` step:
+
+```python
+# Python — inside the loop, where you dispatch the model's tool call:
+result = run_tool(name, **args)
+agenthog.get_default_client().log_tool_call(name=name, input=args, output=result)
+```
+
+```ts
+// TypeScript — same idea:
+const result = await runTool(name, args);
+await getDefaultClient()!.logToolCall({ name, input: args, output: result });
+```
+
+`log_tool_call` / `logToolCall` take `name` plus optional `input`, `output`,
+`status`, `duration_ms`, `error`. Skip this step only when every tool runs
+through an auto-instrumented framework.
 
 ## 6. Update `.env` and `.env.example`
 

@@ -70,12 +70,20 @@ even when the user's code throws.
 
 ### `startSpan`
 
-```ts
-import { startSpan } from "agenthog";
+`StartSpanArgs` is `{ name?, kind? }` — there is **no** `attributes` field, and
+the `ctx` passed to the callback is an `IdentityContext` with **no**
+`setAttribute()`. Record detail with a `log*` helper (or raw `emit`) instead:
 
-await startSpan({ name: "retrieve_docs", attributes: { k: 5 } }, async (span) => {
+```ts
+import { startSpan, getDefaultClient } from "agenthog";
+
+await startSpan({ name: "retrieve_docs", kind: "internal" }, async (ctx) => {
   const docs = await retrieve(query);
-  span.setAttribute("doc_count", docs.length);
+  await getDefaultClient()!.logToolCall({
+    name: "retrieve_docs",
+    input: { k: 5 },
+    output: { docCount: docs.length },
+  });
   return docs;
 });
 ```
@@ -105,10 +113,46 @@ near the top of your entrypoint.
 import { getDefaultClient } from "agenthog";
 const client = getDefaultClient()!;
 
+// Record each tool the agent invokes (raw, non-framework tool calls are not
+// auto-instrumented — without this they don't appear as tool_call steps).
+await client.logToolCall({ name: "lookup_order", input: { orderId: "ORD-1002" }, output: { status: "shipped" } });
 await client.logBusinessEvent({ name: "checkout_completed", revenue: 49.99 });
-await client.logFlagCheck({ flag: "new-prompt-v2", variant: "treatment", evaluatedAs: true });
 await client.logEval({ name: "hallucination_score", score: 0.12 });
 ```
+
+Helpers on the client: `logLlmCall`, `logToolCall`, `logEval`,
+`logBusinessEvent`, `logFlagCheck`, `logSecurityAlert`, `logHandoff`,
+`logRetrieval`.
+
+## Feature flags & experiments
+
+Two ways to record flag/experiment evaluations:
+
+**1. Let AgentHog resolve the flag — `flag(key, default, context?)`.**
+Evaluates against definitions polled from `GET /v1/flags` (cached, refreshed
+every 60s; first-match-wins rules with percentage rollout + variants), returns
+the value, and **auto-emits** `agent.flag_check`:
+
+```ts
+import { flag } from "agenthog";
+const model = await flag("model-routing", "gpt-4o-mini", { userId });
+```
+
+**2. Record an externally-resolved flag — `client.logFlagCheck(...)`.**
+Use when your own system (LaunchDarkly, Statsig, config) decides the value:
+
+```ts
+await client.logFlagCheck({
+  key: "new-prompt-v2",
+  value: true,
+  variant: "treatment",
+  experimentId: "exp-42",
+  reason: "rule_match", // one of: default | rule_match | percentage_rollout
+});
+```
+
+Both emit `agent.flag_check` with `flag.key` / `flag.value` / `flag.variant` /
+`flag.experiment_id` / `flag.reason`, so the dashboard can slice by experiment arm.
 
 ## Failure-mode contract
 

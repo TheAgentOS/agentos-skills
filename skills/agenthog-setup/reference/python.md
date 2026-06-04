@@ -65,10 +65,18 @@ kwargs above (`user_id`, `session_id`, `agent_id`, etc.).
 
 ### `start_span` — nest spans inside a task run
 
+Signature is `start_span(name, kind="internal")`. It yields an
+`IdentityContext` (carrying `trace_id` / `span_id` / `task_run_id`), **not** an
+OpenTelemetry span — there is no `attributes=` kwarg and no `set_attribute()`
+method. To record detail for the work inside a span, emit a typed event with
+one of the `log_*` helpers below (or a raw `agenthog.emit(...)`):
+
 ```python
-with agenthog.start_span(name="retrieve_docs", attributes={"k": 5}) as span:
+with agenthog.start_span(name="retrieve_docs", kind="internal"):
     docs = retrieve(query)
-    span.set_attribute("doc_count", len(docs))
+    agenthog.get_default_client().log_tool_call(
+        name="retrieve_docs", input={"k": 5}, output={"doc_count": len(docs)}
+    )
 ```
 
 ## Auto-instrumentation
@@ -87,16 +95,62 @@ Detects installed packages and patches in: `openai`, `anthropic`,
 
 ## Manual logging
 
-When auto-instrumentation isn't possible (custom LLM client, tool calls
-outside any framework), emit events directly:
+When auto-instrumentation isn't possible (custom LLM client, or **tool calls in
+a hand-written agent loop** — the common case), log events directly. Available
+helpers on the client: `log_llm_call`, `log_tool_call`, `log_eval`,
+`log_business_event`, `log_flag_check`, `log_security_alert`, `log_handoff`,
+`log_retrieval`.
 
 ```python
 client = agenthog.get_default_client()
 
+# Record each tool the agent invokes, so it shows as a tool_call step in the
+# trace. Without this, raw (non-framework) tool calls are invisible and evals
+# can wrongly conclude "the agent never used a tool."
+client.log_tool_call(
+    name="lookup_order",
+    input={"order_id": "ORD-1002"},
+    output={"status": "shipped"},
+)
 client.log_business_event(name="checkout_completed", revenue=49.99)
-client.log_flag_check(flag="new-prompt-v2", variant="treatment", evaluated_as=True)
 client.log_eval(name="hallucination_score", score=0.12)
 ```
+
+> `autoinstrument` covers `openai`/`anthropic`/`langchain` LLM calls — and
+> LangChain/LangGraph tool nodes — but **not** tool calls you make in a plain
+> OpenAI/Anthropic loop; those need an explicit `log_tool_call`.
+
+## Feature flags & experiments
+
+Two ways to record flag/experiment evaluations:
+
+**1. Let AgentHog resolve the flag — `client.flag(key, default, **context)`.**
+Evaluates against flag definitions polled from `GET /v1/flags` (cached, refreshed
+every 60s; local first-match-wins rule eval with percentage rollout + variants),
+returns the resolved value, and **auto-emits** an `agent.flag_check`:
+
+```python
+client = agenthog.get_default_client()
+model = client.flag("model-routing", default="gpt-4o-mini", user_id=user_id)
+```
+
+**2. Record an externally-resolved flag — `client.log_flag_check(...)`.**
+Use when your own system (LaunchDarkly, Statsig, config) decides the value and
+you just want it in the trace:
+
+```python
+client.log_flag_check(
+    "new-prompt-v2",            # flag key
+    True,                        # resolved value
+    variant="treatment",
+    experiment_id="exp-42",
+    reason="rule_match",         # one of: default | rule_match | percentage_rollout
+)
+```
+
+Both emit `agent.flag_check` with `flag.key` / `flag.value` / `flag.variant` /
+`flag.experiment_id` / `flag.reason`, so the dashboard can slice metrics by
+experiment arm.
 
 ## Failure-mode contract
 
@@ -138,6 +192,7 @@ projects under PII / HIPAA constraints.
 
 SemVer with 0.x policy: minor bumps may break; patch bumps are safe. The 0.1.4
 release added deprecation aliases for the `project_id → workspace_id` rename;
-the aliases are scheduled for removal in 0.2.0.
+as of 0.2.0 the aliases are **still read** but emit a one-time
+`DeprecationWarning` (removal deferred to a later release).
 
 See https://github.com/TheAgentOS/agentos-python/blob/main/CHANGELOG.md
