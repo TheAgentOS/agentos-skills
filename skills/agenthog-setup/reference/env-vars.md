@@ -22,7 +22,7 @@ Passing them inline to `init(...)` is fine for scripts.
 | `AGENTOS_ENV` | `null` | Environment tag (`prod`, `staging`, `dev`). Surfaces in the UI as a filter. |
 | `AGENTOS_DISABLE` | `0` | Set to `1`/`true` to make all SDK calls no-ops. Useful in CI / tests. |
 
-## Deprecated (removed in 0.2.0)
+## Deprecated (still read in 0.2.0 — emits a warning)
 
 | Var | Replacement | Notes |
 |---|---|---|
