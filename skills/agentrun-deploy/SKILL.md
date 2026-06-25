@@ -2,6 +2,8 @@
 name: agentrun-deploy
 description: Deploy an agent to AgentRun — Docker-isolated runtime with scheduled (cron) or event-triggered (webhook) process models, syscall mediator, kill switches. PLANNED — not yet implemented.
 status: planned
+metadata:
+  internal: true  # hide from `npx skills add` until implemented
 triggers:
   - deploy this agent
   - run on agentrun
