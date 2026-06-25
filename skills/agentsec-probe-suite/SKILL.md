@@ -2,6 +2,8 @@
 name: agentsec-probe-suite
 description: Add the AgentSec probe library (200+ adversarial probes — injection, PII exfil, refusal evasion, destructive-tool-intent) to CI for pre-prod red-teaming. PLANNED — not yet implemented.
 status: planned
+metadata:
+  internal: true  # hide from `npx skills add` until implemented
 triggers:
   - add probes
   - security audit this agent

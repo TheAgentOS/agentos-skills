@@ -2,6 +2,8 @@
 name: agenthog-add-eval
 description: Add an evaluator that scores agent outputs and surfaces the score on traces in the AgentHog dashboard. PLANNED — not yet implemented.
 status: planned
+metadata:
+  internal: true  # hide from `npx skills add` until implemented
 triggers:
   - add an evaluator
   - score outputs

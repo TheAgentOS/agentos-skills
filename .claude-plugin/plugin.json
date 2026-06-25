@@ -6,10 +6,6 @@
   "homepage": "https://github.com/TheAgentOS/agentos-skills",
   "license": "MIT",
   "skills": [
-    "skills/agenthog-setup",
-    "skills/agenthog-add-eval",
-    "skills/agentrun-deploy",
-    "skills/agentsec-probe-suite",
-    "skills/agentbuild-init"
+    "skills/agenthog-setup"
   ]
 }

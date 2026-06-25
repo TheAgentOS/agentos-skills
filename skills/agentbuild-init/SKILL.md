@@ -2,6 +2,8 @@
 name: agentbuild-init
 description: Scaffold a new agent project with the AgentOS contract baked in — tracing, runtime, security primitives wired from line one. PLANNED — not yet implemented.
 status: planned
+metadata:
+  internal: true  # hide from `npx skills add` until implemented
 triggers:
   - scaffold an agent
   - create a new agent project
