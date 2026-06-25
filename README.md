@@ -10,13 +10,30 @@ agent that reads `AGENTS.md` or the
 
 ## Install
 
-```bash
-npx skills add TheAgentOS/agentos-skills
-```
+Pick the command for your editor. Each one skips the installer's interactive
+"which agents?" picker and lands the skill where your editor actually reads it:
 
-Drops the skill files into your project's agent-config locations (`.claude/`,
-`.cursor/`, `AGENTS.md`, etc.) so whatever IDE agent you're using picks them
-up automatically.
+| Editor | Command |
+|---|---|
+| **Cursor**, Codex, Gemini CLI, GitHub Copilot, Amp, Zed, Warp, OpenCode … | `npx skills add TheAgentOS/agentos-skills -y` |
+| **Claude Code** | `npx skills add TheAgentOS/agentos-skills --agent claude-code -y` |
+| **Windsurf** | `npx skills add TheAgentOS/agentos-skills --agent windsurf -y` |
+| **Other / not sure** | `npx skills add TheAgentOS/agentos-skills` |
+
+Why this matters:
+
+- The `skills` CLI is a standalone terminal tool — it can't tell which editor
+  launched it, so without a flag it shows the same long agent picker to
+  everyone. `-y` skips it.
+- **Cursor, Codex, and most editors** read the shared `.agents/skills/` store,
+  so `-y` alone is enough — nothing else to wire.
+- **Claude Code and Windsurf** read their *own* directories
+  (`.claude/skills/`, `.windsurf/skills/`). The `--agent` flag makes the
+  installer create that directory even in a brand-new project. Without it a
+  `-y` run drops files only into `.agents/skills/` and those editors never
+  discover the skill (the installer still prints success — a silent miss).
+- **Other / not sure** runs interactively so you can pick your tool from the
+  list — the one path where the picker appears, on purpose.
 
 Direct install (no npx):
 
