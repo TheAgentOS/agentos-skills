@@ -39,34 +39,49 @@ fires.
 
 ### Required: `AGENTOS_API_KEY` and `AGENTOS_WORKSPACE_ID`
 
-Check, in order:
+These are resolved at **runtime from the environment** — the SDK reads them
+from env vars (see the `init` examples below). Your job is to wire the code to
+those env vars, not to obtain or store the secret yourself.
 
-1. **Environment** — `AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`.
-2. **A user-provided file** like `.env`, `.env.local`, `.envrc`.
-3. **Ask the user** if neither is found. Direct them to
-   https://app.theagentos.space :
+1. **Already in the environment?** (`AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`
+   set) — good, nothing to gather. Wire the code to read them and move on.
+2. **Not set? Ask the user.** Point them to https://app.theagentos.space :
    - `AGENTOS_API_KEY` — Settings → API Keys → "New default credential"
    - `AGENTOS_WORKSPACE_ID` — bottom-left of the sidebar (click the chip to
      copy), or top-right of the dashboard
+
+   Then ask **how they manage secrets** (shell env, a secret manager, or a
+   gitignored `.env`) and let **them** place the value there. Do not paste the
+   key into your reply and do not write it to a file yourself.
+
+**Credential safety (do not deviate):**
+
+- **Never search the filesystem or read files hunting for a key.** Don't grep
+  `.env`/`.envrc`/config files for secrets. If the value isn't already in the
+  environment, ask the user — don't go looking.
+- **Never hardcode the key** in source, and **never print or echo it.** The
+  code references `AGENTOS_API_KEY` via the environment, never a literal.
+- **The agent never writes the plaintext secret to disk.** You may create or
+  update `.env.example` with a **placeholder** (Step 6); the real value is the
+  user's to place.
 
 ### Endpoint: default silently
 
 `AGENTOS_ENDPOINT` resolves in this order without prompting the user:
 
-1. If `AGENTOS_ENDPOINT` is already set in env or `.env`, use that.
+1. If `AGENTOS_ENDPOINT` is already set in the environment, use that.
 2. Otherwise, use the default: `https://api.theagentos.space`.
 
 **Only prompt the user about the endpoint if** you have *positive evidence*
-they want to override it, such as:
-- They typed something like "I'm self-hosting" or "we run agenthog on our
-  own infra" in their request.
-- A previous `.env` file already had a non-default `AGENTOS_ENDPOINT` set.
+they want to override it — e.g. they said something like "I'm self-hosting" or
+"we run agenthog on our own infra" in their request.
 
 Otherwise: pick the default and move on. Asking for the endpoint on every
 quickstart is annoying friction for the 95% who use the hosted cloud.
 
-**Never commit the plaintext API key.** Always write it to `.env` (gitignored)
-and add a placeholder line to `.env.example`.
+**Never commit the plaintext API key**, and don't write it to disk yourself —
+the user places the real value (Step 6 wires the code + the `.env.example`
+placeholder).
 
 ## 3. Install the SDK (a new-enough version is mandatory)
 
@@ -287,9 +302,10 @@ await getDefaultClient()!.logToolCall({ name, input: args, output: result });
 `status`, `duration_ms`, `error`. Skip this step only when every tool runs
 through an auto-instrumented framework.
 
-## 6. Update `.env` and `.env.example`
+## 6. Document the config (placeholders only — never the real key)
 
-Add three lines to `.env.example` (or create it):
+Add three **placeholder** lines to `.env.example` (or create it). This file is
+committed, so it must never contain a real key:
 
 ```
 AGENTOS_API_KEY=agops_replace_me
@@ -297,7 +313,11 @@ AGENTOS_WORKSPACE_ID=ws_replace_me
 AGENTOS_ENDPOINT=https://api.theagentos.space
 ```
 
-Add the real values to `.env`. Confirm `.env` is in `.gitignore` (it usually is).
+Then **tell the user to set the real values themselves** — in their shell
+environment, secret manager, or a gitignored `.env` (their choice from Step 2).
+Do **not** write the plaintext key to any file on their behalf. If they use a
+`.env`, confirm it's listed in `.gitignore` (add it if missing) so the secret
+can't be committed.
 
 ## 7. Verify
 
@@ -365,6 +385,10 @@ Once a trace is verified visible, tell the user:
 - **Never throw.** The user's agent must keep running even if AgentHog is
   misconfigured. The SDK guarantees its own calls don't raise; your wiring
   should match that contract.
+- **Credentials stay in the environment.** The API key is read from an env var
+  at runtime. Never hardcode it, never print or echo it, never write the
+  plaintext value to a file, and never scan the filesystem for it. Wire the
+  code to the env var and let the user place the secret (Step 2).
 - **Don't auto-instrument secrets.** If the user has prompts containing PII
   or API keys, mention the privacy controls (`capture_content=False`) in
   the report — don't change the default silently.
