@@ -73,12 +73,13 @@ and add a placeholder line to `.env.example`.
 > **Minimum supported version: `agenthog >= 0.3.0`.** Newer features
 > (`log_tool_call` / `logToolCall`, `log_flag_check` / `logFlagCheck`, the
 > feature-flag/experiment resolver) require it, and the ingestion API **rejects
-> events from older SDKs** (HTTP 426). You — the AI coding agent running this
-> skill — MUST install or upgrade to satisfy this floor automatically. Do **not**
-> ask the user to do it by hand, and do **not** leave an older version in place.
+> events from older SDKs** (HTTP 426). Below the floor, setup won't work.
 
-Always pin the floor and pass the upgrade flag so an existing older install is
-bumped, not left as-is.
+Install (or upgrade) `agenthog` as part of setup, using the project's existing
+package manager — the same one already managing its dependencies. Tell the user
+what you're adding, and pin the floor so an existing older install is bumped
+rather than left as-is. If you can't determine the package manager, ask before
+installing.
 
 ### Python
 
@@ -138,21 +139,21 @@ re-check before continuing — the rest of the setup (and the ingestion API)
 assumes it.
 
 ```bash
-# Python
+# Python — prints the installed version; exits non-zero if below the floor.
 python -c "import agenthog, sys; from importlib.metadata import version; \
 v=version('agenthog'); print('agenthog', v); \
-sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,3) else 1)" \
-  || pip install -U 'agenthog>=0.3.0'
+sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,3) else 1)"
 
-# TypeScript
+# TypeScript — same idea.
 node -e "const v=require('agenthog/package.json').version; const [a,b]=v.split('.').map(Number); \
-console.log('agenthog', v); process.exit((a>0||b>=3)?0:1)" \
-  || npm install agenthog@latest
+console.log('agenthog', v); process.exit((a>0||b>=3)?0:1)"
 ```
 
-If the floor still can't be met (e.g. the registry hasn't published `0.3.0`
-yet), **stop and tell the user** rather than proceeding on an unsupported
-version — their telemetry would be rejected at ingest.
+If the check reports a version below `0.3.0`, upgrade it the same way you
+installed it (the package manager's upgrade for `agenthog`) and re-run the
+check. If the floor still can't be met (e.g. the registry hasn't published
+`0.3.0` yet), **stop and tell the user** rather than proceeding on an
+unsupported version — their telemetry would be rejected at ingest.
 
 ## 4. Wire `init` at app startup
 
