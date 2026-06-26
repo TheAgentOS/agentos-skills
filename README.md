@@ -35,6 +35,21 @@ Why this matters:
 - **Other / not sure** runs interactively so you can pick your tool from the
   list — the one path where the picker appears, on purpose.
 
+### Windows / PowerShell
+
+If you see `npx : File … npx.ps1 cannot be loaded because running scripts is
+disabled on this system` (a `UnauthorizedAccess` / `PSSecurityException`), that's
+PowerShell's execution policy blocking `npx`'s script — not this package. Either
+swap `npx` for **`npx.cmd`** (a Command-shell shim the policy doesn't apply to):
+
+```powershell
+npx.cmd skills add TheAgentOS/agentos-skills --agent claude-code -y
+```
+
+or use the no-Node installer below (it runs via `iex`, which the policy doesn't
+block), or allow local scripts once with
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
 Direct install (no npx):
 
 ```bash
