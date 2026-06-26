@@ -45,25 +45,40 @@ those env vars, not to obtain or store the secret yourself.
 
 1. **Already in the environment?** (`AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`
    set) — good, nothing to gather. Wire the code to read them and move on.
-2. **Not set? Ask the user.** Point them to https://app.theagentos.space :
-   - `AGENTOS_API_KEY` — Settings → API Keys → "New default credential"
-   - `AGENTOS_WORKSPACE_ID` — bottom-left of the sidebar (click the chip to
-     copy), or top-right of the dashboard
+2. **Not set? Capture them — without handling the secret yourself.**
 
-   Then ask **how they manage secrets** (shell env, a secret manager, or a
-   gitignored `.env`) and let **them** place the value there. Do not paste the
-   key into your reply and do not write it to a file yourself.
+   **Python — run `agenthog init`** (the preferred path; requires
+   `agenthog >= 0.5.0`, which Step 3 installs). It interactively prompts the
+   user for the API key (hidden) and workspace ID and writes them to a
+   gitignored `.env`. Tell the user to run it and let them type the key — you do
+   not see, paste, or store it:
+
+   ```bash
+   agenthog init
+   ```
+
+   It upserts `.env` (preserving other lines), sets `0600` perms, and adds
+   `.env` to `.gitignore`. If the user prefers a secret manager or shell env
+   instead of `.env`, they can skip `agenthog init` and set the vars there.
+
+   **TypeScript / other runtimes** (no `agenthog init` yet): point the user to
+   https://app.theagentos.space and have **them** place the values in their
+   shell env, secret manager, or a gitignored `.env`:
+   - `AGENTOS_API_KEY` — Settings → API Keys → "New default credential"
+   - `AGENTOS_WORKSPACE_ID` — sidebar chip (bottom-left), or top-right of the
+     dashboard
 
 **Credential safety (do not deviate):**
 
 - **Never search the filesystem or read files hunting for a key.** Don't grep
   `.env`/`.envrc`/config files for secrets. If the value isn't already in the
-  environment, ask the user — don't go looking.
+  environment, run `agenthog init` (Python) or ask the user — don't go looking.
 - **Never hardcode the key** in source, and **never print or echo it.** The
   code references `AGENTOS_API_KEY` via the environment, never a literal.
-- **The agent never writes the plaintext secret to disk.** You may create or
-  update `.env.example` with a **placeholder** (Step 6); the real value is the
-  user's to place.
+- **The agent never writes the plaintext secret to disk.** `agenthog init`
+  (driven by the user typing their key) or the user does that. You may create or
+  update `.env.example` with a **placeholder** (Step 6); the real value is never
+  yours to handle.
 
 ### Endpoint: default silently
 
@@ -85,10 +100,12 @@ placeholder).
 
 ## 3. Install the SDK (a new-enough version is mandatory)
 
-> **Minimum supported version: `agenthog >= 0.3.0`.** Newer features
-> (`log_tool_call` / `logToolCall`, `log_flag_check` / `logFlagCheck`, the
-> feature-flag/experiment resolver) require it, and the ingestion API **rejects
-> events from older SDKs** (HTTP 426). Below the floor, setup won't work.
+> **Minimum supported version: Python `agenthog >= 0.5.0`, TypeScript
+> `agenthog >= 0.3.0`.** The ingestion API **rejects events from older SDKs**
+> (HTTP 426), and the `log_tool_call` / `log_flag_check` / feature-flag
+> resolver APIs need ≥ 0.3.0. The Python floor is 0.5.0 because Step 2 uses the
+> `agenthog init` credential command, which shipped in 0.5.0. Below the floor,
+> setup won't work.
 
 Install (or upgrade) `agenthog` as part of setup, using the project's existing
 package manager — the same one already managing its dependencies. Tell the user
@@ -102,30 +119,30 @@ Detect the package manager (`uv`, `poetry`, `pip`, `pipenv`) and install with th
 version floor + upgrade:
 
 ```bash
-# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.3.0)
-uv add 'agenthog>=0.3.0'
+# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.5.0)
+uv add 'agenthog>=0.5.0'
 
 # poetry
-poetry add 'agenthog@>=0.3.0'
+poetry add 'agenthog@>=0.5.0'
 
 # pip  (-U upgrades an already-installed older copy)
-pip install -U 'agenthog>=0.3.0'
+pip install -U 'agenthog>=0.5.0'
 ```
 
 For frameworks with first-class auto-instrumentation, install the extras:
 
 ```bash
 # OpenAI calls
-uv add 'agenthog[openai]>=0.3.0'
+uv add 'agenthog[openai]>=0.5.0'
 
 # Anthropic
-uv add 'agenthog[anthropic]>=0.3.0'
+uv add 'agenthog[anthropic]>=0.5.0'
 
 # LangChain / LangGraph
-uv add 'agenthog[langchain]>=0.3.0'
+uv add 'agenthog[langchain]>=0.5.0'
 
 # OpenTelemetry passthrough
-uv add 'agenthog[otel]>=0.3.0'
+uv add 'agenthog[otel]>=0.5.0'
 ```
 
 ### TypeScript
@@ -149,15 +166,15 @@ required at install time. See `reference/typescript.md`.
 
 ### Verify the installed version satisfies the floor (do not skip)
 
-After installing, confirm the version is `>= 0.3.0`. If it isn't, upgrade and
-re-check before continuing — the rest of the setup (and the ingestion API)
-assumes it.
+After installing, confirm the version (Python `>= 0.5.0`, TypeScript `>= 0.3.0`).
+If it isn't, upgrade and re-check before continuing — the rest of the setup (and
+the ingestion API) assumes it.
 
 ```bash
 # Python — prints the installed version; exits non-zero if below the floor.
 python -c "import agenthog, sys; from importlib.metadata import version; \
 v=version('agenthog'); print('agenthog', v); \
-sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,3) else 1)"
+sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,5) else 1)"
 
 # TypeScript — same idea.
 node -e "const v=require('agenthog/package.json').version; const [a,b]=v.split('.').map(Number); \
@@ -313,11 +330,16 @@ AGENTOS_WORKSPACE_ID=ws_replace_me
 AGENTOS_ENDPOINT=https://api.theagentos.space
 ```
 
-Then **tell the user to set the real values themselves** — in their shell
-environment, secret manager, or a gitignored `.env` (their choice from Step 2).
-Do **not** write the plaintext key to any file on their behalf. If they use a
-`.env`, confirm it's listed in `.gitignore` (add it if missing) so the secret
-can't be committed.
+For the **real** values:
+
+- **Python (used `agenthog init` in Step 2):** the gitignored `.env` is already
+  written and ignored — nothing more to do here except the committed
+  `.env.example` placeholders above (for teammates).
+- **Otherwise:** **tell the user to set the real values themselves** — in their
+  shell environment, secret manager, or a gitignored `.env`. Do **not** write
+  the plaintext key to any file on their behalf. If they use a `.env`, confirm
+  it's listed in `.gitignore` (add it if missing) so the secret can't be
+  committed.
 
 ### Make the `.env` actually load (do not skip)
 
