@@ -319,6 +319,24 @@ Do **not** write the plaintext key to any file on their behalf. If they use a
 `.env`, confirm it's listed in `.gitignore` (add it if missing) so the secret
 can't be committed.
 
+### Make the `.env` actually load (do not skip)
+
+A `.env` file does **not** populate `os.environ` / `process.env` on its own.
+The SDK reads the keys from the environment at runtime (Step 4), so if the app
+doesn't load `.env` the user will set everything correctly and still see **no
+trace** with an empty/missing key. Wire the load step to match the runtime:
+
+| Runtime | How `.env` reaches the environment |
+|---|---|
+| **Next.js** | Automatic — Next loads `.env` / `.env.local`. Nothing to add. |
+| **Node (non-Next)** | Run with `node --env-file=.env …` (Node 20+), or add `import "dotenv/config";` as the first import. |
+| **Python — FastAPI / Flask / script** | Add `from dotenv import load_dotenv; load_dotenv()` **before** `agenthog.init(...)` (add the `python-dotenv` dep), or use `pydantic-settings`, or run via `uv run --env-file .env …`. |
+| **Any runtime** | Or just export in the shell before launching: `export AGENTOS_API_KEY=… AGENTOS_WORKSPACE_ID=…`. |
+
+Pick the one matching the project. If you add `load_dotenv()`, place it at the
+top of the entrypoint, before `init` runs. Confirm the var is actually populated
+(Step 7's "Confirm `AGENTOS_API_KEY` is loaded" check) before declaring done.
+
 ## 7. Verify
 
 Run the app. Exercise one request that hits the wrapped handler. Then
