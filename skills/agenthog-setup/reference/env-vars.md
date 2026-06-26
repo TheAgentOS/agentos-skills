@@ -13,6 +13,11 @@ read the same variables. Explicit args to `init(...)` override env vars.
 Setting both via env is the recommended path for production deploys.
 Passing them inline to `init(...)` is fine for scripts.
 
+**Python: `agenthog init`** (requires `agenthog >= 0.5.0`) is the quickest way
+to set the two required values locally — it prompts for them and writes a
+gitignored `.env` (the key is entered by the user, never handled by the coding
+agent). For production, prefer real environment variables or a secret manager.
+
 ## Optional
 
 | Var | Default | Purpose |
