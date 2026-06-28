@@ -1,6 +1,6 @@
 ---
 name: agenthog-setup
-description: Install the AgentHog SDK and wire tracing into the project — init at startup, wrap the primary agent loop, add env vars, verify a first trace lands.
+description: Install the AgentHog SDK and wire tracing into the project — init at startup, wrap the primary agent loop, add env vars, verify a first trace lands. Use when the user asks to "set up agenthog", "add agenthog tracing", "instrument with agenthog", "add observability", "wire up tracing", or "add tracing to this app".
 triggers:
   - set up agenthog
   - add agenthog tracing
@@ -39,42 +39,58 @@ fires.
 
 ### Required: `AGENTOS_API_KEY` and `AGENTOS_WORKSPACE_ID`
 
-These are resolved at **runtime from the environment** — the SDK reads them
-from env vars (see the `init` examples below). Your job is to wire the code to
-those env vars, not to obtain or store the secret yourself.
+These are secrets, resolved at **runtime from the environment** — the SDK reads
+`AGENTOS_API_KEY` / `AGENTOS_WORKSPACE_ID` from env vars (see the `init`
+examples below). Your job is to wire the code to those env vars and confirm the
+values are present — **never to obtain, see, or store the secret yourself.**
 
 1. **Already in the environment?** (`AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`
    set) — good, nothing to gather. Wire the code to read them and move on.
-2. **Not set? The user provides them — you never handle the secret.** Ask the
-   user to set the two values in **their own shell**, in the terminal where
-   they'll run the app:
+2. **Not set? The user provides them — you never handle the secret.** Offer two
+   ways and **prefer the first.** A bare `export` is per-shell and dies when the
+   terminal closes — a common cause of "it traced once, then stopped," and it's
+   invisible to any other shell (including your own tool shell):
 
-   ```bash
-   export AGENTOS_API_KEY=<their key>
-   export AGENTOS_WORKSPACE_ID=<their workspace id>
-   ```
+   - **Preferred — `agenthog init`** (`agenthog >= 0.5.0`): prompts for both
+     values, writes a gitignored `.env` (`0600`), and persists across restarts
+     and across shells. The user runs it and types the key; you do not. Because
+     it writes `.env`, the values survive new terminals — no two-shells
+     mismatch.
+   - **Fallback — shell `export`** (ephemeral, fine for a quick one-off): the
+     user sets the values in the terminal where they'll run the app:
 
-   The quickstart page gives them a ready-to-paste `export` block pre-filled
-   with both values. Once exported, re-check the environment and continue — the
-   code reads `AGENTOS_API_KEY` / `AGENTOS_WORKSPACE_ID` at runtime. Get values
-   from https://app.theagentos.space (API key: Settings → API Keys; workspace
-   ID: sidebar chip / top-right).
+     ```bash
+     export AGENTOS_API_KEY=<their key>
+     export AGENTOS_WORKSPACE_ID=<their workspace id>
+     ```
 
-   **Persistence (optional, Python):** `export` lasts only for that shell
-   session. If the user wants it persisted to a gitignored `.env`, they can run
-   `agenthog init` (`agenthog >= 0.5.0`) — it prompts for the values, writes
-   `.env` (`0600`), and gitignores it. The user runs it and types the key; you
-   do not.
+     The quickstart page gives a ready-to-paste `export` block. This lasts only
+     for that shell session — recommend `agenthog init` for anything persistent.
+
+   Get values from https://app.theagentos.space (API key: Settings → API Keys;
+   workspace ID: sidebar chip / top-right). Once the user has done one of these,
+   **confirm presence by name** (below) and continue.
+
+**Confirm presence without ever reading the secret:**
+
+Check that the vars are *set*, never their value — a boolean presence test,
+never `cat .env` or echoing the key into your context:
+
+```bash
+# prints only yes/no; resolves env first, then a gitignored .env the app loads
+python3 -c "import os; print('AGENTOS_API_KEY set:', bool(os.getenv('AGENTOS_API_KEY')))"
+```
+
+If it prints `False`, the user hasn't completed `agenthog init` / `export` yet —
+ask them to finish, don't go hunting for the value.
 
 **Credential safety (do not deviate):**
 
 - **Never accept the API key pasted into the chat.** If a user offers to paste
-  it, decline and tell them to `export` it in their shell (or run `agenthog
-  init`) instead — you reference `AGENTOS_API_KEY` by name, never the value.
-- **Never search the filesystem or read files hunting for a key.** Don't grep
-  `.env`/`.envrc`/config files for secrets. If the value isn't already in the
-  environment, ask the user to export it (or run `agenthog init`) — don't go
-  looking.
+  it, decline and tell them to run `agenthog init` (or `export` it) instead —
+  you reference `AGENTOS_API_KEY` by name, never the value.
+- **Never search the filesystem or read files hunting for a key**, and never
+  open `.env` to read the secret. Confirm presence by env-var name only (above).
 - **Never hardcode the key** in source, and **never print or echo it.** The
   code references `AGENTOS_API_KEY` via the environment, never a literal.
 - **The agent never writes the plaintext secret to disk.** `agenthog init`
