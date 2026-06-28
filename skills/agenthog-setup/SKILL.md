@@ -342,7 +342,7 @@ frameworks; for hand-written tools they require an annotation too.
 **This step is what produces the full workflow tree (tool calls + LLM call), not
 just the model step. Do it whenever the agent has tool/helper functions.**
 
-### Preferred — decorate the tool functions (`agenthog >= 0.7.0`)
+### Preferred — decorate the tool functions (Python, `agenthog >= 0.7.0`)
 
 Add `@agenthog.tool` to each function the agent uses as a tool. One line each;
 captures args → `tool.input`, return → `tool.output`, plus duration / status /
@@ -361,11 +361,11 @@ def _geocode(city: str) -> tuple[float, float] | None:
     ...
 ```
 
-```ts
-// TypeScript: wrap the tool function (or log explicitly, below).
-import { tool } from "agenthog";
-const getWeather = tool("get_weather", (city: string) => fetchWeather(city));
-```
+> **TypeScript has no `@tool` decorator yet** (JS SDK is pre-`0.6.0`; the
+> decorator, raw-HTTP capture, and auto-flush-on-exit are Python-only for now).
+> For Node/TS agents, instrument tools with the explicit `logToolCall` path in
+> the Alternative section below, and be aware the rest of the auto-capture story
+> is thinner than Python until the JS SDK catches up.
 
 Identify the tool functions and decorate them — typically the helpers the
 entrypoint calls before/around the LLM call (data fetches, lookups, actions).
