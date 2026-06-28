@@ -233,10 +233,26 @@ agenthog.init(
     agent_id="<descriptive-agent-name>",  # pick based on what this service is
 )
 
-# Optional: auto-instrument supported LLM / framework libraries.
-# Detects installed packages (openai, anthropic, langchain) and patches them.
+# Auto-instrument supported LLM / framework libraries. Detects installed
+# packages (openai, anthropic, langchain) and patches them. As of
+# agenthog >= 0.6.0 it ALSO captures raw-HTTP calls to OpenAI-compatible
+# /chat/completions endpoints made via `requests` or `httpx` — so agents that
+# POST directly to NVIDIA, Together, Groq, OpenRouter, a local vLLM/Ollama,
+# etc. (instead of through a vendor SDK) get traced with no code change.
 agenthog.autoinstrument()
 ```
+
+> **Provider coverage.** `autoinstrument()` (>= 0.6.0) covers the vendor SDKs
+> **and** raw-HTTP OpenAI-compatible calls. If the agent talks to a *custom or
+> non-OpenAI-shaped* endpoint that neither path recognizes, the LLM call won't
+> be auto-captured — log it explicitly with `agenthog.emit("agent.llm_call",
+> {...})` (or `log_tool_call` for tools, Step 5b). When verifying (Step 7),
+> confirm the trace actually shows the LLM step, not just an empty `task_run`.
+
+> **Flushing on exit is automatic** in agenthog >= 0.6.0: `init()` registers an
+> `atexit` + `SIGTERM` drain, so short-lived CLIs / scripts deliver their buffer
+> without a manual `flush()`. Only a hard kill (`SIGKILL`, `os._exit`) bypasses
+> it — call `agenthog.shutdown()` before such an exit if you have one.
 
 ### TypeScript init pattern
 
@@ -377,7 +393,13 @@ Pick the one matching the project. If you add `load_dotenv()`, place it at the
 top of the entrypoint, before `init` runs. Confirm the var is actually populated
 (Step 7's "Confirm `AGENTOS_API_KEY` is loaded" check) before declaring done.
 
-## 7. Verify
+## 7. Verify (hard gate — do not skip, do not assume)
+
+**This step is mandatory and blocking.** Setup is **not done** until you have
+seen a real trace from a real run. Wiring `init` + `start_task_run` does not by
+itself produce a trace: if no LLM/tool call is captured, the trace is an empty
+`task_run` and nothing useful appears. **Never report success because the code
+"looks wired up" — only because you observed the trace.**
 
 Run the app. Exercise one request that hits the wrapped handler. Then
 verify via **one** of these paths, in order of simplicity:
@@ -428,6 +450,16 @@ Path A.
 4. Confirm the app actually called `init` before the handler runs
    (sometimes `init` is wired after the handler import — fix the import
    order so `init` runs first at module load).
+5. **Trace appears but is empty (no LLM step)?** The model call wasn't
+   captured. `autoinstrument()` covers the vendor SDKs and — on
+   agenthog >= 0.6.0 — raw-HTTP OpenAI-compatible `/chat/completions` calls.
+   A custom/non-OpenAI-shaped endpoint won't be auto-traced: log it with
+   `agenthog.emit("agent.llm_call", {...})`. (On older SDKs, raw `requests` /
+   `httpx` calls are never captured — upgrade to >= 0.6.0 or switch to the
+   OpenAI SDK with a custom `base_url`.)
+6. **Short-lived script and nothing arrives?** On agenthog >= 0.6.0 the buffer
+   flushes on exit automatically; on older versions add `agenthog.flush()`
+   before the process exits, or upgrade.
 
 ## 8. Report back
 
