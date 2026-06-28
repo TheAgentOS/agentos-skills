@@ -326,32 +326,67 @@ If the user's framework has a middleware concept (Express, Hono, FastAPI
 middleware), prefer wiring `start_task_run` as a middleware so every request
 gets a task_run automatically.
 
-## 5b. Instrument tool calls (hand-written agent loops)
+## 5b. Instrument the agent's tools (the full execution tree)
 
-`autoinstrument()` patches LLM SDKs (`openai`/`anthropic`/`langchain`) and
-LangChain/LangGraph tool nodes — but **not** tool calls you execute yourself in
-a raw OpenAI/Anthropic tool-calling loop. Those run untraced, so the trace shows
-only LLM steps; evals that look for tool usage then wrongly report "the agent
-never used a tool / hallucinated."
+`autoinstrument()` captures **LLM calls** (vendor SDKs + raw-HTTP
+OpenAI-compatible calls) — but **not** the agent's *tools*: ordinary functions
+that hit an API, query a DB, geocode, run a computation. Left alone, the trace
+shows only the LLM step, and evals that look for tool usage wrongly report "the
+agent never used a tool / hallucinated." This is the same boundary in every
+tracer — Arize/LangSmith auto-trace the full tree only on instrumented
+frameworks; for hand-written tools they require an annotation too.
 
-If the agent executes tools in its own loop, log each one explicitly so it shows
-up as a `tool_call` step:
+**This step is what produces the full workflow tree (tool calls + LLM call), not
+just the model step. Do it whenever the agent has tool/helper functions.**
+
+### Preferred — decorate the tool functions (`agenthog >= 0.7.0`)
+
+Add `@agenthog.tool` to each function the agent uses as a tool. One line each;
+captures args → `tool.input`, return → `tool.output`, plus duration / status /
+error, as an `agent.tool_call` step under the active `task_run`. Works on sync
+and async functions; safe to leave in place before `init()`.
 
 ```python
-# Python — inside the loop, where you dispatch the model's tool call:
+import agenthog
+
+@agenthog.tool
+def get_weather(city: str) -> dict | None:
+    ...
+
+@agenthog.tool(name="geocode")          # custom step name
+def _geocode(city: str) -> tuple[float, float] | None:
+    ...
+```
+
+```ts
+// TypeScript: wrap the tool function (or log explicitly, below).
+import { tool } from "agenthog";
+const getWeather = tool("get_weather", (city: string) => fetchWeather(city));
+```
+
+Identify the tool functions and decorate them — typically the helpers the
+entrypoint calls before/around the LLM call (data fetches, lookups, actions).
+After decorating, a run should produce a multi-step trace like
+`task_run → get_weather → geocode → get_air_quality → llm_call`.
+
+### Alternative — log explicitly (older SDKs, or a raw tool-calling loop)
+
+If you can't decorate (e.g. tools dispatched dynamically in a model
+tool-calling loop, or `agenthog < 0.7.0`), log each call:
+
+```python
 result = run_tool(name, **args)
 agenthog.get_default_client().log_tool_call(name=name, input=args, output=result)
 ```
 
 ```ts
-// TypeScript — same idea:
 const result = await runTool(name, args);
 await getDefaultClient()!.logToolCall({ name, input: args, output: result });
 ```
 
 `log_tool_call` / `logToolCall` take `name` plus optional `input`, `output`,
-`status`, `duration_ms`, `error`. Skip this step only when every tool runs
-through an auto-instrumented framework.
+`status`, `duration_ms`, `error`. Skip tool instrumentation only when every tool
+already runs through an auto-instrumented framework.
 
 ## 6. Document the config (placeholders only — never the real key)
 
@@ -400,6 +435,12 @@ seen a real trace from a real run. Wiring `init` + `start_task_run` does not by
 itself produce a trace: if no LLM/tool call is captured, the trace is an empty
 `task_run` and nothing useful appears. **Never report success because the code
 "looks wired up" — only because you observed the trace.**
+
+**Check the trace is complete, not just present.** It should contain the LLM
+call **and** a `tool_call` step for each tool the agent used (Step 5b). A trace
+with only the `llm_call` and no tool steps means the tools weren't instrumented
+— go back and decorate them. The goal is the full execution tree, the way
+Arize/LangSmith show it.
 
 Run the app. Exercise one request that hits the wrapped handler. Then
 verify via **one** of these paths, in order of simplicity:
