@@ -118,12 +118,14 @@ placeholder).
 
 ## 3. Install the SDK (a new-enough version is mandatory)
 
-> **Minimum supported version: Python `agenthog >= 0.5.0`, TypeScript
+> **Minimum supported version: Python `agenthog >= 0.7.0`, TypeScript
 > `agenthog >= 0.3.0`.** The ingestion API **rejects events from older SDKs**
-> (HTTP 426), and the `log_tool_call` / `log_flag_check` / feature-flag
-> resolver APIs need ≥ 0.3.0. The Python floor is 0.5.0 because Step 2 uses the
-> `agenthog init` credential command, which shipped in 0.5.0. Below the floor,
-> setup won't work.
+> (HTTP 426). The Python floor is **0.7.0** because this skill depends on its
+> features end-to-end: `agenthog init` credentials (0.5.0), raw-HTTP LLM capture
+> for OpenAI-compatible endpoints + automatic flush-on-exit (0.6.0), and the
+> `@agenthog.tool` / `@traceable` decorator for tracing the agent's tools
+> (0.7.0). Below the floor, setup produces incomplete traces (missing tool
+> steps, or none at all from a short-lived process).
 
 Install (or upgrade) `agenthog` as part of setup, using the project's existing
 package manager — the same one already managing its dependencies. Tell the user
@@ -137,30 +139,30 @@ Detect the package manager (`uv`, `poetry`, `pip`, `pipenv`) and install with th
 version floor + upgrade:
 
 ```bash
-# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.5.0)
-uv add 'agenthog>=0.5.0'
+# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.7.0)
+uv add 'agenthog>=0.7.0'
 
 # poetry
-poetry add 'agenthog@>=0.5.0'
+poetry add 'agenthog@>=0.7.0'
 
 # pip  (-U upgrades an already-installed older copy)
-pip install -U 'agenthog>=0.5.0'
+pip install -U 'agenthog>=0.7.0'
 ```
 
 For frameworks with first-class auto-instrumentation, install the extras:
 
 ```bash
 # OpenAI calls
-uv add 'agenthog[openai]>=0.5.0'
+uv add 'agenthog[openai]>=0.7.0'
 
 # Anthropic
-uv add 'agenthog[anthropic]>=0.5.0'
+uv add 'agenthog[anthropic]>=0.7.0'
 
 # LangChain / LangGraph
-uv add 'agenthog[langchain]>=0.5.0'
+uv add 'agenthog[langchain]>=0.7.0'
 
 # OpenTelemetry passthrough
-uv add 'agenthog[otel]>=0.5.0'
+uv add 'agenthog[otel]>=0.7.0'
 ```
 
 ### TypeScript
@@ -184,7 +186,7 @@ required at install time. See `reference/typescript.md`.
 
 ### Verify the installed version satisfies the floor (do not skip)
 
-After installing, confirm the version (Python `>= 0.5.0`, TypeScript `>= 0.3.0`).
+After installing, confirm the version (Python `>= 0.7.0`, TypeScript `>= 0.3.0`).
 If it isn't, upgrade and re-check before continuing — the rest of the setup (and
 the ingestion API) assumes it.
 
@@ -192,18 +194,19 @@ the ingestion API) assumes it.
 # Python — prints the installed version; exits non-zero if below the floor.
 python -c "import agenthog, sys; from importlib.metadata import version; \
 v=version('agenthog'); print('agenthog', v); \
-sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,5) else 1)"
+sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,7) else 1)"
 
 # TypeScript — same idea.
 node -e "const v=require('agenthog/package.json').version; const [a,b]=v.split('.').map(Number); \
 console.log('agenthog', v); process.exit((a>0||b>=3)?0:1)"
 ```
 
-If the check reports a version below `0.3.0`, upgrade it the same way you
-installed it (the package manager's upgrade for `agenthog`) and re-run the
-check. If the floor still can't be met (e.g. the registry hasn't published
-`0.3.0` yet), **stop and tell the user** rather than proceeding on an
-unsupported version — their telemetry would be rejected at ingest.
+If the check reports a version below the floor (Python `0.7.0`, TypeScript
+`0.3.0`), upgrade it the same way you installed it (the package manager's
+upgrade for `agenthog`) and re-run the check. If the floor still can't be met
+(e.g. the registry hasn't published it yet), **stop and tell the user** rather
+than proceeding on an unsupported version — their telemetry would be rejected at
+ingest, or the trace would be missing tool steps.
 
 ## 4. Wire `init` at app startup
 
