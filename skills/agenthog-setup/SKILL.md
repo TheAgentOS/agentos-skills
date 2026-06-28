@@ -45,34 +45,36 @@ those env vars, not to obtain or store the secret yourself.
 
 1. **Already in the environment?** (`AGENTOS_API_KEY`, `AGENTOS_WORKSPACE_ID`
    set) — good, nothing to gather. Wire the code to read them and move on.
-2. **Not set? Capture them — without handling the secret yourself.**
-
-   **Python — run `agenthog init`** (the preferred path; requires
-   `agenthog >= 0.5.0`, which Step 3 installs). It interactively prompts the
-   user for the API key (hidden) and workspace ID and writes them to a
-   gitignored `.env`. Tell the user to run it and let them type the key — you do
-   not see, paste, or store it:
+2. **Not set? The user provides them — you never handle the secret.** Ask the
+   user to set the two values in **their own shell**, in the terminal where
+   they'll run the app:
 
    ```bash
-   agenthog init
+   export AGENTOS_API_KEY=<their key>
+   export AGENTOS_WORKSPACE_ID=<their workspace id>
    ```
 
-   It upserts `.env` (preserving other lines), sets `0600` perms, and adds
-   `.env` to `.gitignore`. If the user prefers a secret manager or shell env
-   instead of `.env`, they can skip `agenthog init` and set the vars there.
+   The quickstart page gives them a ready-to-paste `export` block pre-filled
+   with both values. Once exported, re-check the environment and continue — the
+   code reads `AGENTOS_API_KEY` / `AGENTOS_WORKSPACE_ID` at runtime. Get values
+   from https://app.theagentos.space (API key: Settings → API Keys; workspace
+   ID: sidebar chip / top-right).
 
-   **TypeScript / other runtimes** (no `agenthog init` yet): point the user to
-   https://app.theagentos.space and have **them** place the values in their
-   shell env, secret manager, or a gitignored `.env`:
-   - `AGENTOS_API_KEY` — Settings → API Keys → "New default credential"
-   - `AGENTOS_WORKSPACE_ID` — sidebar chip (bottom-left), or top-right of the
-     dashboard
+   **Persistence (optional, Python):** `export` lasts only for that shell
+   session. If the user wants it persisted to a gitignored `.env`, they can run
+   `agenthog init` (`agenthog >= 0.5.0`) — it prompts for the values, writes
+   `.env` (`0600`), and gitignores it. The user runs it and types the key; you
+   do not.
 
 **Credential safety (do not deviate):**
 
+- **Never accept the API key pasted into the chat.** If a user offers to paste
+  it, decline and tell them to `export` it in their shell (or run `agenthog
+  init`) instead — you reference `AGENTOS_API_KEY` by name, never the value.
 - **Never search the filesystem or read files hunting for a key.** Don't grep
   `.env`/`.envrc`/config files for secrets. If the value isn't already in the
-  environment, run `agenthog init` (Python) or ask the user — don't go looking.
+  environment, ask the user to export it (or run `agenthog init`) — don't go
+  looking.
 - **Never hardcode the key** in source, and **never print or echo it.** The
   code references `AGENTOS_API_KEY` via the environment, never a literal.
 - **The agent never writes the plaintext secret to disk.** `agenthog init`
