@@ -118,20 +118,16 @@ placeholder).
 
 ## 3. Install the SDK (a new-enough version is mandatory)
 
-> **Minimum supported version: Python `agenthog >= 0.7.0`, TypeScript
+> **Minimum supported version: Python `agenthog >= 0.9.0`, TypeScript
 > `agenthog >= 0.3.0`.** The ingestion API **rejects events from older SDKs**
-> (HTTP 426). The Python floor is **0.7.0** because this skill depends on its
+> (HTTP 426). The Python floor is **0.9.0** because this skill depends on its
 > features end-to-end: `agenthog init` credentials (0.5.0), raw-HTTP LLM capture
-> for OpenAI-compatible endpoints + automatic flush-on-exit (0.6.0), and the
+> for OpenAI-compatible endpoints + automatic flush-on-exit (0.6.0), the
 > `@agenthog.tool` / `@traceable` decorator for tracing the agent's tools
-> (0.7.0). Below the floor, setup produces incomplete traces (missing tool
-> steps, or none at all from a short-lived process).
->
-> **One-call tool capture (`instrument_module`, Step 5b) needs `>= 0.9.0`.** It
-> is preferred when available because it can't silently miss a tool; on
-> `0.7.0`–`0.8.0` fall back to decorating each tool with `@agenthog.tool`. This
-> is an enhancement, not a new hard floor — `>= 0.7.0` still installs and traces
-> correctly.
+> (0.7.0), and **one-call tool capture `instrument_module` (Step 5b, 0.9.0)** —
+> which guarantees no tool is silently missed. Below the floor, setup produces
+> incomplete traces (missing tool steps, or none at all from a short-lived
+> process).
 
 Install (or upgrade) `agenthog` as part of setup, using the project's existing
 package manager — the same one already managing its dependencies. Tell the user
@@ -145,30 +141,30 @@ Detect the package manager (`uv`, `poetry`, `pip`, `pipenv`) and install with th
 version floor + upgrade:
 
 ```bash
-# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.7.0)
-uv add 'agenthog>=0.7.0'
+# uv  (uv add always resolves to the newest allowed; the floor guarantees ≥0.9.0)
+uv add 'agenthog>=0.9.0'
 
 # poetry
-poetry add 'agenthog@>=0.7.0'
+poetry add 'agenthog@>=0.9.0'
 
 # pip  (-U upgrades an already-installed older copy)
-pip install -U 'agenthog>=0.7.0'
+pip install -U 'agenthog>=0.9.0'
 ```
 
 For frameworks with first-class auto-instrumentation, install the extras:
 
 ```bash
 # OpenAI calls
-uv add 'agenthog[openai]>=0.7.0'
+uv add 'agenthog[openai]>=0.9.0'
 
 # Anthropic
-uv add 'agenthog[anthropic]>=0.7.0'
+uv add 'agenthog[anthropic]>=0.9.0'
 
 # LangChain / LangGraph
-uv add 'agenthog[langchain]>=0.7.0'
+uv add 'agenthog[langchain]>=0.9.0'
 
 # OpenTelemetry passthrough
-uv add 'agenthog[otel]>=0.7.0'
+uv add 'agenthog[otel]>=0.9.0'
 ```
 
 ### TypeScript
@@ -192,7 +188,7 @@ required at install time. See `reference/typescript.md`.
 
 ### Verify the installed version satisfies the floor (do not skip)
 
-After installing, confirm the version (Python `>= 0.7.0`, TypeScript `>= 0.3.0`).
+After installing, confirm the version (Python `>= 0.9.0`, TypeScript `>= 0.3.0`).
 If it isn't, upgrade and re-check before continuing — the rest of the setup (and
 the ingestion API) assumes it.
 
@@ -200,14 +196,14 @@ the ingestion API) assumes it.
 # Python — prints the installed version; exits non-zero if below the floor.
 python -c "import agenthog, sys; from importlib.metadata import version; \
 v=version('agenthog'); print('agenthog', v); \
-sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,7) else 1)"
+sys.exit(0 if tuple(map(int, v.split('.')[:2])) >= (0,9) else 1)"
 
 # TypeScript — same idea.
 node -e "const v=require('agenthog/package.json').version; const [a,b]=v.split('.').map(Number); \
 console.log('agenthog', v); process.exit((a>0||b>=3)?0:1)"
 ```
 
-If the check reports a version below the floor (Python `0.7.0`, TypeScript
+If the check reports a version below the floor (Python `0.9.0`, TypeScript
 `0.3.0`), upgrade it the same way you installed it (the package manager's
 upgrade for `agenthog`) and re-run the check. If the floor still can't be met
 (e.g. the registry hasn't published it yet), **stop and tell the user** rather
@@ -376,7 +372,7 @@ double-wrapped**. **Enumerate the agent's tool module(s) and pass each through
 one `instrument_module` call — this is what makes "all tools captured"
 structural rather than a per-function judgment you can under-apply.**
 
-### If on `agenthog 0.7.0`–`0.8.0`, or tools are spread across many files — decorate each
+### When tools are spread across many files, or you want per-function control — decorate each
 
 Add `@agenthog.tool` to each function the agent uses as a tool. One line each;
 captures args → `tool.input`, return → `tool.output`, plus duration / status /
@@ -412,7 +408,8 @@ produce a multi-step trace like
 ### Alternative — log explicitly (older SDKs, or a raw tool-calling loop)
 
 If you can't decorate (e.g. tools dispatched dynamically in a model
-tool-calling loop, or `agenthog < 0.7.0`), log each call:
+tool-calling loop, or the TS SDK which has neither `instrument_module` nor
+`@tool`), log each call:
 
 ```python
 result = run_tool(name, **args)
