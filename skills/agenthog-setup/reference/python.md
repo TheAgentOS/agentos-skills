@@ -91,7 +91,30 @@ agenthog.autoinstrument(
 ```
 
 Detects installed packages and patches in: `openai`, `anthropic`,
-`langchain` (and `langgraph` via langchain-core).
+`langchain` (and `langgraph` via langchain-core). As of `0.8.0` it also ingests
+OpenInference / OTel spans, and captures raw-HTTP OpenAI-compatible calls.
+
+## Tracing custom tools
+
+`autoinstrument` captures LLM calls; a hand-written agent's *tools* are ordinary
+functions and need marking. Two ways, both emit an `agent.tool_call` step under
+the active `task_run`:
+
+```python
+# Per function — @agenthog.tool (>= 0.7.0)
+@agenthog.tool
+def get_weather(city: str) -> dict: ...
+
+# Whole tools module in one call — instrument_module (>= 0.9.0). Wraps every
+# public function defined in the module and RETURNS the names wrapped, so you
+# can assert the trace shows that many tool steps (nothing silently missed).
+import weather
+wrapped = agenthog.instrument_module(weather)   # ['get_weather', 'geocode', ...]
+```
+
+`instrument_module` skips private helpers (leading `_`), imported names,
+classes, and constants; override with `include=[...]` / `exclude=[...]`. It
+reuses `@tool`, so already-decorated functions are never double-wrapped.
 
 ## Manual logging
 
