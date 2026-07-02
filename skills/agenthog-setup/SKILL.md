@@ -126,6 +126,12 @@ placeholder).
 > `@agenthog.tool` / `@traceable` decorator for tracing the agent's tools
 > (0.7.0). Below the floor, setup produces incomplete traces (missing tool
 > steps, or none at all from a short-lived process).
+>
+> **One-call tool capture (`instrument_module`, Step 5b) needs `>= 0.9.0`.** It
+> is preferred when available because it can't silently miss a tool; on
+> `0.7.0`–`0.8.0` fall back to decorating each tool with `@agenthog.tool`. This
+> is an enhancement, not a new hard floor — `>= 0.7.0` still installs and traces
+> correctly.
 
 Install (or upgrade) `agenthog` as part of setup, using the project's existing
 package manager — the same one already managing its dependencies. Tell the user
@@ -342,12 +348,42 @@ frameworks; for hand-written tools they require an annotation too.
 **This step is what produces the full workflow tree (tool calls + LLM call), not
 just the model step. Do it whenever the agent has tool/helper functions.**
 
-### Preferred — decorate the tool functions (Python, `agenthog >= 0.7.0`)
+### Preferred — one call over the tools module (Python, `agenthog >= 0.9.0`)
+
+Point `instrument_module` at the module holding the agent's tool functions. It
+wraps **every public function defined there** as an `agent.tool_call` step in a
+single call — so no tool can be silently missed the way per-function decorating
+can. It **returns the list of wrapped names**; keep that list for the Step 7
+count check.
+
+```python
+import agenthog
+import weather            # the module with the agent's tool functions
+
+agenthog.init(...)
+wrapped = agenthog.instrument_module(weather)
+# wrapped == ['get_weather', 'get_air_quality', 'geocode']
+```
+
+It skips private helpers (leading `_`), imported names, classes, and constants.
+Tune the selection when the defaults don't fit:
+
+- A public function that isn't a tool → `instrument_module(weather, exclude=["build_prompt"])`.
+- A tool named with a leading `_`, or one that lives among imports → `instrument_module(weather, include=["_geocode"])`.
+
+Functions you already decorated with `@agenthog.tool` are detected and **not
+double-wrapped**. **Enumerate the agent's tool module(s) and pass each through
+one `instrument_module` call — this is what makes "all tools captured"
+structural rather than a per-function judgment you can under-apply.**
+
+### If on `agenthog 0.7.0`–`0.8.0`, or tools are spread across many files — decorate each
 
 Add `@agenthog.tool` to each function the agent uses as a tool. One line each;
 captures args → `tool.input`, return → `tool.output`, plus duration / status /
 error, as an `agent.tool_call` step under the active `task_run`. Works on sync
-and async functions; safe to leave in place before `init()`.
+and async functions; safe to leave in place before `init()`. Decorate **every**
+tool — a missed one is silently absent from the trace (exactly what
+`instrument_module` prevents).
 
 ```python
 import agenthog
@@ -361,15 +397,16 @@ def _geocode(city: str) -> tuple[float, float] | None:
     ...
 ```
 
-> **TypeScript has no `@tool` decorator yet** (JS SDK is pre-`0.6.0`; the
-> decorator, raw-HTTP capture, and auto-flush-on-exit are Python-only for now).
-> For Node/TS agents, instrument tools with the explicit `logToolCall` path in
-> the Alternative section below, and be aware the rest of the auto-capture story
-> is thinner than Python until the JS SDK catches up.
+> **TypeScript has no `@tool` decorator or `instrument_module` yet** (JS SDK is
+> pre-`0.6.0`; bulk capture, the decorator, raw-HTTP capture, and
+> auto-flush-on-exit are Python-only for now). For Node/TS agents, instrument
+> tools with the explicit `logToolCall` path in the Alternative section below,
+> and be aware the rest of the auto-capture story is thinner than Python until
+> the JS SDK catches up.
 
-Identify the tool functions and decorate them — typically the helpers the
-entrypoint calls before/around the LLM call (data fetches, lookups, actions).
-After decorating, a run should produce a multi-step trace like
+Identify the tool functions — typically the helpers the entrypoint calls
+before/around the LLM call (data fetches, lookups, actions). Either path should
+produce a multi-step trace like
 `task_run → get_weather → geocode → get_air_quality → llm_call`.
 
 ### Alternative — log explicitly (older SDKs, or a raw tool-calling loop)
@@ -440,10 +477,14 @@ itself produce a trace: if no LLM/tool call is captured, the trace is an empty
 "looks wired up" — only because you observed the trace.**
 
 **Check the trace is complete, not just present.** It should contain the LLM
-call **and** a `tool_call` step for each tool the agent used (Step 5b). A trace
-with only the `llm_call` and no tool steps means the tools weren't instrumented
-— go back and decorate them. The goal is the full execution tree, the way
-Arize/LangSmith show it.
+call **and** a `tool_call` step for each tool the agent used (Step 5b).
+**Count them:** the number of distinct `tool_call` steps must equal the number
+of tools instrumented — the length of the list `instrument_module` returned, or
+the number of functions you decorated with `@agenthog.tool`. Fewer means a tool
+was missed (or an execution path didn't run it); a trace with only the
+`llm_call` and no tool steps means the tools weren't instrumented at all — go
+back to Step 5b. Do not pass this gate on a count mismatch. The goal is the full
+execution tree, the way Arize/LangSmith show it.
 
 Run the app. Exercise one request that hits the wrapped handler. Then
 verify via **one** of these paths, in order of simplicity:
